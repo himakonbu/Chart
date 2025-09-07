@@ -29,7 +29,7 @@
   .label{font-weight:800; font-size:16px; margin-bottom:8px}
 
   /* Inputs */
-  input, select, button{font:inherit}
+  input, select, button{font:inherit; font-size:16px} /* iOSのフォーカス時ズーム抑止 */
   input[type="number"], select{ width:100%; padding:12px; border:1px solid var(--border); border-radius:12px; background:#fff }
   button.primary{background:var(--accent); color:#fff; border:0; padding:14px 16px; border-radius:12px; font-weight:900; width:100%}
   button.ghost{background:#ecfdf5; color:#065f46; border:1px dashed #a7f3d0; border-radius:10px; padding:10px 12px; cursor:pointer}
@@ -47,6 +47,8 @@
 
   .swap{display:flex; align-items:center; justify-content:center}
   .swap button{border:0;background:#ecfdf5;color:#065f46;border-radius:10px;padding:10px; cursor:pointer}
+  /* ダブルタップズーム抑止（対応ブラウザで有効）*/
+  .seg label, button, .swap button, .menu-btn{ touch-action: manipulation; }
   .muted{ color:var(--muted) }
   .result-jp{font-size:1.35rem; font-weight:900}
   .result-en{color:#4b5563}
@@ -211,10 +213,27 @@
     set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)) }catch{} }
   };
 
+  /* ====== Viewport scaling toggle (Chart時のみページ拡大を抑止) ====== */
+  const viewportMeta = document.querySelector('meta[name="viewport"]');
+  const originalViewport = viewportMeta?.getAttribute('content') || 'width=device-width, initial-scale=1';
+  function setViewportScaling(disable){
+    if (!viewportMeta) return;
+    if (disable){
+      const base = originalViewport.split(',').filter(s=>!(/maximum-scale|user-scalable/i).test(s)).join(',').trim();
+      viewportMeta.setAttribute('content', base + ', maximum-scale=1, user-scalable=no');
+    } else {
+      viewportMeta.setAttribute('content', originalViewport);
+    }
+  }
+  window.addEventListener('pageshow', ()=>{ if(document.body.dataset?.feature==='chart') setViewportScaling(true); });
+  window.addEventListener('beforeunload', ()=> setViewportScaling(false));
+
   // ====== Header: feature tabs & menu ======
   function setFeature(f){
     document.body.dataset.feature = f;
     store.set('feature', f);
+    // チャート時のみページ拡大（ピンチ/ダブルタップ）を抑止
+    setViewportScaling(f==='chart');
     if (f==='chart') ensureChartRendered();
   }
 
