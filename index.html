@@ -55,6 +55,10 @@
 
   /* ===== Views ===== */
   .view{ display:none }
+  /* JSが落ちても最低限コンバート画面は見えるようにするフォールバック */
+  #view-convert{ display:block }
+  /* data-featureが設定されたら通常ルールに戻す */
+  body[data-feature] #view-convert{ display:none }
   body[data-feature="convert"] #view-convert{ display:block }
   body[data-feature="chart"]   #view-chart{ display:block }
   body[data-feature="gloss"]   #view-gloss{ display:block }
@@ -239,12 +243,18 @@
     store.set('feature', f);
     // チャート時のみページ拡大（ピンチ/ダブルタップ）を抑止
     setViewportScaling(f==='chart');
+    // チャート以外に移動したら、全画面表示中なら閉じる
+    if (f !== 'chart' && window.__closeFS) { try{ window.__closeFS(); }catch(e){} }
     if (f==='chart') ensureChartRendered();
   }
 
   const savedFeature = store.get('feature','convert');
-  document.getElementById('f-'+savedFeature)?.setAttribute('checked','checked');
-  setFeature(savedFeature);
+  try{
+    document.getElementById('f-'+savedFeature)?.setAttribute('checked','checked');
+    setFeature(savedFeature);
+  }catch(e){
+    setFeature('convert');
+  }
 
   document.getElementById('featureSeg').addEventListener('change', ()=>{
     const f = document.querySelector('#featureSeg input:checked')?.value || 'convert';
@@ -375,7 +385,14 @@
     renderFS();
     onOrientFS = ()=>{ setTimeout(renderFS, 350); };
     window.addEventListener('orientationchange', onOrientFS);
-    document.getElementById('fsClose').addEventListener('click', ()=>{ window.removeEventListener('orientationchange', onOrientFS); if (fsNode){ fsNode.remove(); fsNode=null; } });
+
+    // グローバルに閉じる関数を提供（他ビューへ切替時に呼ぶ）
+    window.__closeFS = function(){
+      window.removeEventListener('orientationchange', onOrientFS);
+      if (fsNode){ fsNode.remove(); fsNode=null; }
+      window.__closeFS = null;
+    };
+    document.getElementById('fsClose').addEventListener('click', ()=>{ if (window.__closeFS) window.__closeFS(); });
   }
   const $btnFull = document.getElementById('btnFull'); if ($btnFull) $btnFull.addEventListener('click', openFullscreenChart);
 
