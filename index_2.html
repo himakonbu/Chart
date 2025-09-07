@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="ja">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>通貨ペアチャート（TradingView）</title>
+<style>
+  :root{ --accent:#22c55e; --border:#e5e7eb; --card:#fff; --bg:#f6f7f9; }
+  body{ margin:0; background:var(--bg); font-family:system-ui,-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif; color:#0f172a }
+  .wrap{ max-width:980px; margin:24px auto 56px; padding:0 16px }
+  .card{ background:var(--card); border:1px solid var(--border); border-radius:16px; padding:16px; box-shadow:0 1px 6px rgba(0,0,0,.04) }
+  h1{ font-size:1.25rem; margin:0 0 12px }
+  .row{ display:grid; gap:12px; align-items:center }
+  .row-3{ grid-template-columns:1fr 60px 1fr }
+  @media (max-width:640px){ .row-3{ grid-template-columns:1fr 52px 1fr } }
+  select{ width:100%; padding:14px 12px; border:1px solid var(--border); border-radius:14px; background:#fff; font-size:1rem }
+  .swap{ display:flex; align-items:center; justify-content:center }
+  .swap button{ width:100%; height:48px; border-radius:12px; border:0; background:#ecfdf5; color:#065f46; font-size:20px; cursor:pointer }
+  #chart{ margin-top:16px }
+  .list{ display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:10px; margin-top:18px }
+  .item{ display:flex; gap:10px; align-items:center; padding:10px 12px; border:1px solid var(--border); border-radius:12px; background:#fff }
+  .flag{ font-size:22px }
+  .code{ font-weight:800; width:56px }
+  .muted{ color:#64748b }
+</style>
+
+<div class="wrap">
+  <div class="card">
+    <h1>通貨を選択</h1>
+    <div class="row row-3">
+      <select id="base"></select>
+      <div class="swap"><button id="btnSwap" title="入れ替え">↔︎</button></div>
+      <select id="quote"></select>
+    </div>
+    <div id="chart"></div>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <h1>通貨コード解説</h1>
+    <div id="list" class="list"></div>
+  </div>
+</div>
+
+<script src="https://s3.tradingview.com/tv.js"></script>
+<script>
+  const currencies = [
+    {code:"USD", flag:"🇺🇸", country:"アメリカ", name:"米ドル"},
+    {code:"JPY", flag:"🇯🇵", country:"日本",     name:"日本円"},
+    {code:"EUR", flag:"🇪🇺", country:"欧州連合", name:"ユーロ"},
+    {code:"GBP", flag:"🇬🇧", country:"イギリス", name:"英ポンド"},
+    {code:"AUD", flag:"🇦🇺", country:"オーストラリア", name:"豪ドル"},
+    {code:"CAD", flag:"🇨🇦", country:"カナダ",   name:"カナダドル"},
+    {code:"CHF", flag:"🇨🇭", country:"スイス",   name:"スイスフラン"},
+    {code:"HKD", flag:"🇭🇰", country:"香港",     name:"香港ドル"},
+    {code:"CNY", flag:"🇨🇳", country:"中国",     name:"人民元"},
+    {code:"KRW", flag:"🇰🇷", country:"韓国",     name:"韓国ウォン"},
+    {code:"BTC", flag:"₿",   country:"暗号資産", name:"ビットコイン"},
+    {code:"XAU", flag:"🥇",   country:"貴金属",   name:"ゴールド（金）"}
+  ];
+
+  const $base  = document.getElementById('base');
+  const $quote = document.getElementById('quote');
+  currencies.forEach(c => {
+    $base.append(new Option(c.code, c.code));
+    $quote.append(new Option(c.code, c.code));
+  });
+  $base.value  = "USD";
+  $quote.value = "JPY";
+
+  const $list = document.getElementById('list');
+  $list.innerHTML = currencies.map(c => `
+    <div class="item">
+      <span class="flag">${c.flag}</span>
+      <b class="code">${c.code}</b>
+      <div>
+        <div>${c.country}</div>
+        <div class="muted">${c.name}</div>
+      </div>
+    </div>
+  `).join("");
+
+  function renderChart() {
+    if ($base.value === $quote.value) return;
+    let symbol;
+
+    // BTCはUSDT固定
+    if ($base.value === "BTC" || $quote.value === "BTC") {
+      symbol = "BINANCE:BTCUSDT";
+    }
+    // GOLDはドル建て固定
+    else if ($base.value === "XAU" || $quote.value === "XAU") {
+      symbol = "TVC:GOLD";
+    }
+    // 通常のFXペア
+    else {
+      symbol = `FX_IDC:${$base.value}${$quote.value}`;
+    }
+
+    const container = document.getElementById('chart');
+    container.innerHTML = "";
+    new TradingView.widget({
+      container_id: "chart",
+      symbol,
+      interval: "60",
+      width: "100%",
+      height: 440,
+      locale: "ja",
+      theme: "light"
+    });
+  }
+
+  renderChart();
+
+  $base.addEventListener('change', renderChart);
+  $quote.addEventListener('change', renderChart);
+  document.getElementById('btnSwap').addEventListener('click', () => {
+    const tmp = $base.value; $base.value = $quote.value; $quote.value = tmp;
+    renderChart();
+  });
+</script>
+</html>
