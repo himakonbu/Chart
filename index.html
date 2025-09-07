@@ -237,27 +237,32 @@
     viewportMeta = clone;
   }
   function setViewportScaling(disable){ applyViewport(disable ? LOCKED_VIEWPORT : ORIGINAL_VIEWPORT); }
+  // ページ読込直後から常時ズーム無効
+  try{ setViewportScaling(true); enableGestureGuard(true); }catch(e){}
 
   // Safariの独自gestureイベントを抑止（効かない環境もあり。保険）
   const gestureGuard = (e)=>{ if (document.body.dataset.feature==='chart') { e.preventDefault(); } };
   function enableGestureGuard(enable){
     ['gesturestart','gesturechange','gestureend'].forEach(type=>{
       try{ window.removeEventListener(type, gestureGuard, {passive:false}); }catch(_){ window.removeEventListener(type, gestureGuard); }
+      if (enable){
+        try{ window.addEventListener(type, gestureGuard, {passive:false}); }catch(_){ window.addEventListener(type, gestureGuard); }
+      }
+    });
+  }); }catch(_){ window.removeEventListener(type, gestureGuard); }
       if (enable){ try{ window.addEventListener(type, gestureGuard, {passive:false}); }catch(_){ window.addEventListener(type, gestureGuard); }
     });
   }
 
   // 初期/復帰時に適用
-  window.addEventListener('pageshow', ()=>{ const onChart = document.body.dataset?.feature==='chart'; setViewportScaling(onChart); enableGestureGuard(onChart); });
+  window.addEventListener('pageshow', ()=>{ setViewportScaling(true); enableGestureGuard(true); }); enableGestureGuard(onChart); });
   window.addEventListener('beforeunload', ()=> { setViewportScaling(false); enableGestureGuard(false); });
 
   // ====== Header: feature tabs & menu ======
   function setFeature(f){
     document.body.dataset.feature = f;
     store.set('feature', f);
-    const lock = f==='chart';
-    setViewportScaling(lock);
-    enableGestureGuard(lock);
+    setViewportScaling(true); enableGestureGuard(true);
     if (!lock && window.__closeFS) { try{ window.__closeFS(); }catch(e){} }
     if (lock) ensureChartRendered();
   }catch(e){} }
