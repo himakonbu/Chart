@@ -1,113 +1,94 @@
 <!doctype html>
 <html lang="ja">
+<head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>通貨ツール（変換・チャート・解説）</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no">
+<title>通貨ツール（変換・チャート・解説）— 完全版</title>
 <style>
-  :root{
-    --accent:#22c55e; --bg:#f6f7f9; --card:#ffffff; --text:#0f172a; --border:#e5e7eb; --radius:14px; --muted:#64748b;
-  }
-  *{box-sizing:border-box}
-  html,body{height:100%}
-  body{ margin:0; background:var(--bg); color:var(--text);
-        font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Hiragino Sans","Noto Sans JP",sans-serif; line-height:1.6 }
+  :root{ --accent:#22c55e; --bg:#f6f7f9; --card:#ffffff; --text:#0f172a; --border:#e5e7eb; --radius:14px; --muted:#64748b; }
+  *{ box-sizing:border-box }
+  html,body{ height:100% }
+  body{ margin:0; background:var(--bg); color:var(--text); font-family:system-ui,-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif; line-height:1.6 }
+  /* iOS フォーカス時ズーム対策 */
+  input,select,button{ font:inherit; font-size:16px }
+  /* ダブルタップズーム抑止（対応ブラウザ） */
+  button,.seg label,.menu-btn,.swap button{ touch-action:manipulation }
 
-  /* ===== Header / Tabs ===== */
-  header{position:sticky; top:0; z-index:20; background:#fff; border-bottom:1px solid var(--border); backdrop-filter:saturate(1.1) blur(6px)}
-  .header-inner{max-width:980px; margin:0 auto; padding:10px 12px; display:flex; align-items:center; gap:12px; justify-content:space-between}
-  .title{font-weight:900; white-space:nowrap}
+  header{ position:sticky; top:0; z-index:20; background:#fff; border-bottom:1px solid var(--border); backdrop-filter:saturate(1.1) blur(6px) }
+  .header-inner{ max-width:980px; margin:0 auto; padding:10px 12px; display:flex; gap:12px; align-items:center; justify-content:space-between }
+  .title{ font-weight:900 }
   .seg{ display:inline-flex; border:1px solid var(--border); border-radius:12px; overflow:hidden; background:#fff }
   .seg input{ display:none }
-  .seg label{ padding:8px 12px; cursor:pointer; font-size:.95rem; user-select:none; display:flex; align-items:center; gap:8px }
-  .seg .icon{ font-size:1.1rem }
+  .seg label{ padding:8px 12px; cursor:pointer; user-select:none; display:flex; align-items:center; gap:8px }
   .seg input:checked + label{ background:var(--accent); color:#fff }
-  /* スペース節約：狭い幅ではテキストを隠してアイコンだけ */
   @media (max-width:520px){ .seg label .text{ display:none } }
 
-  .wrap{max-width:980px; margin:0 auto; padding:16px 12px 56px; display:grid; gap:12px}
-  .card{background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:14px; box-shadow:0 1px 6px rgba(0,0,0,.04)}
-  .label{font-weight:800; font-size:16px; margin-bottom:8px}
-
-  /* Inputs */
-  input, select, button{font:inherit; font-size:16px} /* iOSのフォーカス時ズーム抑止 */
-  input[type="number"], select{ width:100%; padding:12px; border:1px solid var(--border); border-radius:12px; background:#fff }
-  button.primary{background:var(--accent); color:#fff; border:0; padding:14px 16px; border-radius:12px; font-weight:900; width:100%}
-  button.ghost{background:#ecfdf5; color:#065f46; border:1px dashed #a7f3d0; border-radius:10px; padding:10px 12px; cursor:pointer}
-  .row{display:grid; gap:12px}
-  .row-3{grid-template-columns:1fr auto 1fr}
-
-  /* Amount row：モバイル1列、PCは 1fr / 140px */
-  .row-amt{grid-template-columns:1fr}
-  @media(min-width:700px){ .row-amt{grid-template-columns:1fr 140px} }
-
-  /* Loading bar */
-  .loadingbar{height:6px; overflow:hidden; border-radius:3px; background:#e5e7eb; display:none}
-  .loadingbar>div{height:100%; width:33%; background:var(--accent); transform:translateX(-100%); animation:slide 1.15s linear infinite}
-  @keyframes slide { from{transform:translateX(-100%)} to{transform:translateX(300%)} }
-
-  .swap{display:flex; align-items:center; justify-content:center}
-  .swap button{border:0;background:#ecfdf5;color:#065f46;border-radius:10px;padding:10px; cursor:pointer}
-  /* ダブルタップズーム抑止（対応ブラウザで有効）*/
-  .seg label, button, .swap button, .menu-btn{ touch-action: manipulation; }
-  .muted{ color:var(--muted) }
-  .result-jp{font-size:1.35rem; font-weight:900}
-  .result-en{color:#4b5563}
-
-  /* ===== Views ===== */
-  .view{ display:none }
-  /* JSが落ちても最低限コンバート画面は見えるようにするフォールバック */
-  #view-convert{ display:block }
-  /* data-featureが設定されたら通常ルールに戻す */
-  body[data-feature] #view-convert{ display:none }
-  body[data-feature="convert"] #view-convert{ display:block }
-  body[data-feature="chart"]   #view-chart{ display:block }
-  body[data-feature="gloss"]   #view-gloss{ display:block }
-
-  /* ===== Chart specific ===== */
-  #chart{ margin-top:12px }
-  .invalid{ padding:16px;border:1px dashed #fca5a5;border-radius:12px;background:#fff5f5;color:#b91c1c }
-  select:disabled{ background:#f8fafc; color:#94a3b8 }
-
-  /* ===== Layout override menu (⋯) ===== */
   .menu-wrap{ position:relative }
   .menu-btn{ border:1px solid var(--border); background:#fff; border-radius:10px; padding:6px 10px; cursor:pointer }
-  .menu{ position:absolute; right:0; top:40px; min-width:200px; background:#fff; border:1px solid var(--border); border-radius:12px; box-shadow:0 8px 20px rgba(0,0,0,.08); padding:6px; display:none }
-  .menu hr{ border:0; border-top:1px solid var(--border); margin:6px 0 }
-  .menu .row{ grid-template-columns:1fr 1fr 1fr }
-  .menu .seg{ width:100% }
+  .menu{ position:absolute; right:0; top:40px; min-width:220px; background:#fff; border:1px solid var(--border); border-radius:12px; box-shadow:0 10px 24px rgba(0,0,0,.08); padding:8px; display:none }
   .menu.show{ display:block }
+  .menu .muted{ color:var(--muted); font-size:.9rem }
 
-  /* Manual layout helpers */
-  body.layout-mobile .wrap{max-width:440px}
-  body.layout-desktop .wrap{max-width:980px}
-  /* Force amount row columns according to manual mode */
-  body.layout-mobile .row-amt{grid-template-columns:1fr}
-  body.layout-desktop .row-amt{grid-template-columns:1fr 140px}
+  .wrap{ max-width:980px; margin:0 auto; padding:16px 12px 56px; display:grid; gap:12px }
+  .card{ background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:14px; box-shadow:0 1px 6px rgba(0,0,0,.04) }
+  .label{ font-weight:800; font-size:16px; margin-bottom:8px }
 
-  /* Chart height tweak for mobile */
-  @media (max-width:640px){ #chart{ margin-top:8px } }
-  /* === Fullscreen chart overlay === */
-  .fs{position:fixed; inset:0; background:#fff; z-index:100; display:flex; flex-direction:column}
-  .fs-header{display:flex; align-items:center; justify-content:space-between; gap:8px; padding:8px 12px; border-bottom:1px solid var(--border)}
-  .fs-body{flex:1; min-height:0}
-  #fs-chart{ width:100%; height:100%; }
+  .row{ display:grid; gap:12px; align-items:center }
+  .row-3{ grid-template-columns:1fr auto 1fr }
+  .row-amt{ grid-template-columns:1fr }
+  @media(min-width:700px){ .row-amt{ grid-template-columns:1fr 140px } }
+  .swap{ display:flex; align-items:center; justify-content:center }
+  .swap button{ border:0; background:#ecfdf5; color:#065f46; border-radius:10px; padding:10px; cursor:pointer }
+
+  input[type="number"], select{ width:100%; padding:12px; border:1px solid var(--border); border-radius:12px; background:#fff }
+  button.primary{ background:var(--accent); color:#fff; border:0; padding:14px 16px; border-radius:12px; font-weight:900; width:100% }
+  button.ghost{ background:#ecfdf5; color:#065f46; border:1px dashed #a7f3d0; border-radius:10px; padding:10px 12px; cursor:pointer }
+
+  .loadingbar{ height:6px; overflow:hidden; border-radius:3px; background:#e5e7eb; display:none }
+  .loadingbar>div{ height:100%; width:33%; background:var(--accent); transform:translateX(-100%); animation:slide 1.15s linear infinite }
+  @keyframes slide{ from{ transform:translateX(-100%) } to{ transform:translateX(300%) } }
+
+  .muted{ color:var(--muted) }
+  .result-jp{ font-size:1.35rem; font-weight:900 }
+  .result-en{ color:#4b5563 }
+
+  /* Views */
+  .view{ display:none }
+  #view-convert{ display:block } /* JSが落ちても変換は見える */
+  body[data-feature="convert"] #view-convert{ display:block }
+  body[data-feature="chart"] #view-chart{ display:block }
+  body[data-feature="gloss"] #view-gloss{ display:block }
+
+  /* Layout helpers */
+  body.layout-mobile .wrap{ max-width:440px }
+  body.layout-desktop .wrap{ max-width:980px }
+  body.layout-mobile .row-amt{ grid-template-columns:1fr }
+  body.layout-desktop .row-amt{ grid-template-columns:1fr 140px }
+
+  /* Chart */
+  #chart{ margin-top:12px }
+  .invalid{ padding:16px; border:1px dashed #fca5a5; border-radius:12px; background:#fff5f5; color:#b91c1c }
+  select:disabled{ background:#f8fafc; color:#94a3b8 }
+
+  /* Fullscreen overlay */
+  .fs{ position:fixed; inset:0; background:#fff; z-index:100; display:flex; flex-direction:column }
+  .fs-header{ display:flex; align-items:center; justify-content:space-between; gap:8px; padding:8px 12px; border-bottom:1px solid var(--border) }
+  .fs-body{ flex:1; min-height:0 }
+  #fs-chart{ width:100%; height:100% }
 </style>
-
+</head>
+<body>
 <header>
   <div class="header-inner">
     <div class="title">💱 通貨ツール</div>
-
-    <!-- 機能切替：変換 / チャート / 解説 -->
     <div class="seg" id="featureSeg" role="tablist" aria-label="機能切替">
       <input type="radio" name="feature" id="f-convert" value="convert" checked>
-      <label for="f-convert"><span class="icon">🔁</span><span class="text">変換</span></label>
+      <label for="f-convert"><span>🔁</span><span class="text">変換</span></label>
       <input type="radio" name="feature" id="f-chart" value="chart">
-      <label for="f-chart"><span class="icon">📈</span><span class="text">チャート</span></label>
+      <label for="f-chart"><span>📈</span><span class="text">チャート</span></label>
       <input type="radio" name="feature" id="f-gloss" value="gloss">
-      <label for="f-gloss"><span class="icon">💡</span><span class="text">解説</span></label>
+      <label for="f-gloss"><span>💡</span><span class="text">解説</span></label>
     </div>
-
-    <!-- 右上メニュー（レイアウトなど） -->
     <div class="menu-wrap">
       <button class="menu-btn" id="btnMenu" title="メニュー">⋯</button>
       <div class="menu" id="menu">
@@ -117,15 +98,14 @@
           <input type="radio" name="mode" id="m-desktop" value="desktop"><label for="m-desktop">PC</label>
           <input type="radio" name="mode" id="m-mobile" value="mobile"><label for="m-mobile">モバイル</label>
         </div>
-        <hr>
-        <div class="muted" style="padding:6px 8px; font-size:.9rem">※ 設定は端末内に保存されます</div>
+        <div class="muted" style="padding:6px 8px">※ 設定は端末内に保存されます</div>
       </div>
     </div>
   </div>
 </header>
 
 <div class="wrap">
-  <!-- ===== Convert View ===== -->
+  <!-- Convert -->
   <section id="view-convert" class="view">
     <div id="loading" class="loadingbar"><div></div></div>
 
@@ -174,10 +154,13 @@
     </section>
   </section>
 
-  <!-- ===== Chart View ===== -->
+  <!-- Chart -->
   <section id="view-chart" class="view">
     <section class="card">
-      <div class="row" style="grid-template-columns:auto auto; align-items:center"><div class="label" style="margin:0">通貨ペア（チャート）</div><button id="btnFull" class="ghost" style="justify-self:end">⤢ 全画面</button></div>
+      <div class="row" style="grid-template-columns:auto auto; align-items:center">
+        <div class="label" style="margin:0">通貨ペア（チャート）</div>
+        <button id="btnFull" class="ghost" style="justify-self:end">⤢ 全画面</button>
+      </div>
       <div class="row row-3">
         <select id="base" aria-label="基軸通貨"></select>
         <div class="swap"><button id="btnSwap" title="入れ替え">↔︎</button></div>
@@ -188,7 +171,7 @@
     </section>
   </section>
 
-  <!-- ===== Glossary View ===== -->
+  <!-- Gloss -->
   <section id="view-gloss" class="view">
     <section class="card">
       <div class="label">通貨コード解説</div>
@@ -200,294 +183,88 @@
 <!-- TradingView -->
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
-  // ====== Config / Shared ======
-  const currencies = [
-    {code:"USD", flag:"🇺🇸", country:"アメリカ", name:"米ドル"},
-    {code:"JPY", flag:"🇯🇵", country:"日本",     name:"日本円"},
-    {code:"EUR", flag:"🇪🇺", country:"欧州連合", name:"ユーロ"},
-    {code:"GBP", flag:"🇬🇧", country:"イギリス", name:"英ポンド"},
-    {code:"AUD", flag:"🇦🇺", country:"オーストラリア", name:"豪ドル"},
-    {code:"CAD", flag:"🇨🇦", country:"カナダ",   name:"カナダドル"},
-    {code:"CHF", flag:"🇨🇭", country:"スイス",   name:"スイスフラン"},
-    {code:"HKD", flag:"🇭🇰", country:"香港",     name:"香港ドル"},
-    {code:"CNY", flag:"🇨🇳", country:"中国",     name:"人民元"},
-    {code:"KRW", flag:"🇰🇷", country:"韓国",     name:"韓国ウォン"},
-    {code:"BTC", flag:"₿",   country:"暗号資産", name:"ビットコイン"},
-    {code:"XAU", flag:"🥇",   country:"貴金属",   name:"ゴールド（金）"}
-  ];
+(function(){
+  // ===== Utilities =====
+  const store={ get(k,def){ try{const v=localStorage.getItem(k); return v==null?def:JSON.parse(v) }catch{ return def } }, set(k,v){ try{localStorage.setItem(k, JSON.stringify(v))}catch{} } };
+  const $ = (id)=> document.getElementById(id);
 
-  // Persist helpers
-  const store = {
-    get(k, def){ try{ const v = localStorage.getItem(k); return v==null?def:JSON.parse(v) }catch{ return def } },
-    set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)) }catch{} }
-  };
-
-  /* ====== Viewport scaling toggle (Chart時のみページ拡大を抑止・強化版) ====== */
-  let viewportMeta = document.querySelector('meta[name="viewport"]');
-  const ORIGINAL_VIEWPORT = viewportMeta?.getAttribute('content') || 'width=device-width, initial-scale=1';
-  const LOCKED_VIEWPORT   = 'width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no';
-
-  function applyViewport(content){
-    if (!viewportMeta) return;
-    viewportMeta.setAttribute('content', content);
-    // iOS Safari 対策：要素を置換して反映を強制
-    const clone = viewportMeta.cloneNode();
-    clone.setAttribute('content', content);
-    viewportMeta.parentNode.replaceChild(clone, viewportMeta);
-    viewportMeta = clone;
-  }
-  function setViewportScaling(disable){ applyViewport(disable ? LOCKED_VIEWPORT : ORIGINAL_VIEWPORT); }
-  // ページ読込直後から常時ズーム無効
-  try{ setViewportScaling(true); enableGestureGuard(true); }catch(e){}
-
-  // Safariの独自gestureイベントを抑止（効かない環境もあり。保険）
-  const gestureGuard = (e)=>{ if (document.body.dataset.feature==='chart') { e.preventDefault(); } };
-  function enableGestureGuard(enable){
-    ['gesturestart','gesturechange','gestureend'].forEach(type=>{
-      try{ window.removeEventListener(type, gestureGuard, {passive:false}); }catch(_){ window.removeEventListener(type, gestureGuard); }
-      if (enable){
-        try{ window.addEventListener(type, gestureGuard, {passive:false}); }catch(_){ window.addEventListener(type, gestureGuard); }
-      }
-    });
-  }); }catch(_){ window.removeEventListener(type, gestureGuard); }
-      if (enable){ try{ window.addEventListener(type, gestureGuard, {passive:false}); }catch(_){ window.addEventListener(type, gestureGuard); }
-    });
-  }
-
-  // 初期/復帰時に適用
-  window.addEventListener('pageshow', ()=>{ setViewportScaling(true); enableGestureGuard(true); }); enableGestureGuard(onChart); });
-  window.addEventListener('beforeunload', ()=> { setViewportScaling(false); enableGestureGuard(false); });
-
-  // ====== Header: feature tabs & menu ======
-  function setFeature(f){
-    document.body.dataset.feature = f;
-    store.set('feature', f);
-    setViewportScaling(true); enableGestureGuard(true);
-    if (!lock && window.__closeFS) { try{ window.__closeFS(); }catch(e){} }
-    if (lock) ensureChartRendered();
-  }catch(e){} }
-    if (f==='chart') ensureChartRendered();
-  }
-
+  // ===== Feature Tabs & Menu =====
+  function setFeature(f){ document.body.dataset.feature=f; store.set('feature',f); if(f==='chart') ensureChartRendered(); if(f!=='chart' && window.__closeFS) window.__closeFS(); }
   const savedFeature = store.get('feature','convert');
-  try{
-    document.getElementById('f-'+savedFeature)?.setAttribute('checked','checked');
-    setFeature(savedFeature);
-  }catch(e){
-    setFeature('convert');
-  }
+  $('f-'+savedFeature)?.setAttribute('checked','checked');
+  setFeature(savedFeature);
+  $('featureSeg').addEventListener('change', ()=>{ const f=document.querySelector('#featureSeg input:checked')?.value||'convert'; setFeature(f); });
+  const menu=$('menu'); $('btnMenu').addEventListener('click', ()=> menu.classList.toggle('show')); document.addEventListener('click',(e)=>{ if(!e.target.closest('.menu-wrap')) menu.classList.remove('show'); });
 
-  document.getElementById('featureSeg').addEventListener('change', ()=>{
-    const f = document.querySelector('#featureSeg input:checked')?.value || 'convert';
-    setFeature(f);
-  });
+  function applyMode(mode){ document.body.classList.remove('layout-mobile','layout-desktop'); if(mode==='mobile') document.body.classList.add('layout-mobile'); if(mode==='desktop') document.body.classList.add('layout-desktop'); if(document.body.dataset.feature==='chart') safeRenderChart(); }
+  const modeSeg=$('modeSeg'); const modeSaved=store.get('layoutMode','auto'); modeSeg.querySelector('#m-'+modeSaved)?.setAttribute('checked','checked'); applyMode(modeSaved);
+  modeSeg.addEventListener('change', ()=>{ const m=modeSeg.querySelector('input:checked')?.value||'auto'; applyMode(m); store.set('layoutMode',m); menu.classList.remove('show'); });
 
-  // Menu
-  const $menuBtn = document.getElementById('btnMenu');
-  const $menu    = document.getElementById('menu');
-  $menuBtn.addEventListener('click', ()=>{ $menu.classList.toggle('show') });
-  document.addEventListener('click', (e)=>{ if(!e.target.closest('.menu-wrap')) $menu.classList.remove('show') });
-
-  // Manual layout mode (visual width hints only)
-  const modeSaved = store.get('layoutMode','auto');
-  applyMode(modeSaved);
-  const modeSeg = document.getElementById('modeSeg');
-  modeSeg.querySelector(`#m-${modeSaved}`)?.setAttribute('checked','checked');
-  modeSeg.addEventListener('change', ()=>{
-    const m = modeSeg.querySelector('input:checked')?.value || 'auto';
-    applyMode(m); store.set('layoutMode', m);
-  });
-  function applyMode(mode){
-    document.body.classList.remove('layout-mobile','layout-desktop');
-    if (mode==='mobile') document.body.classList.add('layout-mobile');
-    if (mode==='desktop') document.body.classList.add('layout-desktop');
-    // Re-render chart to adapt widget height/layout after mode change
-    if (document.body.dataset.feature === 'chart') { try{ renderChart(); }catch(e){} }
-    // Close menu after selection (helps on mobile)
-    try{ $menu.classList.remove('show'); }catch(e){}
-  }
-
-  // ====== Convert view ======
-  const API_KEY = "b83959fae8ef48f560972001"; // 実験用（公開配布は非推奨）
+  // ===== Convert =====
+  const API_KEY = 'b83959fae8ef48f560972001';
   const unitsMap = {"":1,"万":1e4,"億":1e8,"兆":1e12,"K":1e3,"M":1e6,"B":1e9,"T":1e12};
+  const $amount=$('amount'), $unit=$('unit'), $from=$('from'), $to=$('to'), $swap=$('swap'), $refresh=$('refresh'), $rateText=$('rateText'), $rateTime=$('rateTime'), $convert=$('convert'), $loading=$('loading');
+  function rateKey(){ return `rate_${$from.value}_${$to.value}` } function dateKey(){ return `rateAt_${$from.value}_${$to.value}` }
+  function saveRate(rate){ localStorage.setItem(rateKey(), String(rate)); const stamp=new Date().toLocaleString('ja-JP',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit'}); localStorage.setItem(dateKey(),stamp); paintSaved(); }
+  function loadRate(){ const r=parseFloat(localStorage.getItem(rateKey())||'NaN'); return Number.isFinite(r)?r:null }
+  function paintSaved(){ const r=loadRate(); const t=localStorage.getItem(dateKey())||''; if(r!=null){ $rateText.textContent=`1 ${$from.value} = ${r.toFixed(4)} ${$to.value}`; $rateTime.textContent=t; } else { $rateText.textContent='未取得'; $rateTime.textContent=''; } }
+  function parseAmount(){ const base=parseFloat(($amount.value||'').trim()); if(!Number.isFinite(base)) return null; return base*(unitsMap[$unit.value]||1); }
+  async function fetchRate(){ const from=$from.value,to=$to.value; try{ $loading.style.display='block'; const url=`https://v6.exchangerate-api.com/v6/${encodeURIComponent(API_KEY)}/pair/${from}/${to}`; const res=await fetch(url); if(!res.ok) throw new Error(`HTTP ${res.status}`); const j=await res.json(); if(j.result!=='success') throw new Error(`API error: ${j.result||'unknown'}`); saveRate(j.conversion_rate);}catch(e){ alert('レート取得エラー: '+(e.message||e)); } finally { $loading.style.display='none'; paintSaved(); } }
+  function formatJP(num){ const abs=Math.abs(num),sign=num<0?'-':''; if(abs>=1e12) return `${sign}${(abs/1e12).toFixed(2)}兆`; if(abs>=1e8) return `${sign}${(abs/1e8).toFixed(2)}億`; if(abs>=1e4) return `${sign}${(abs/1e4).toFixed(2)}万`; return `${sign}${abs.toFixed(2)}` }
+  function formatEN(num){ const abs=Math.abs(num),sign=num<0?'-':''; if(abs>=1e12) return `${sign}${(abs/1e12).toFixed(2)}T`; if(abs>=1e9) return `${sign}${(abs/1e9).toFixed(2)}B`; if(abs>=1e6) return `${sign}${(abs/1e6).toFixed(2)}M`; if(abs>=1e3) return `${sign}${(abs/1e3).toFixed(2)}K`; return `${sign}${abs.toFixed(2)}` }
+  function convert(){ const amt=parseAmount(); if(amt==null){ alert('金額を入力'); return; } const rate=loadRate(); if(rate==null){ alert('レート未取得。「更新」を押してください'); return; } const converted=amt*rate; $('resJP').textContent='結果: '+formatJP(converted); $('resEN').textContent=($unit.value?formatEN(converted):''); }
+  $refresh.addEventListener('click', fetchRate); $convert.addEventListener('click', convert); $swap.addEventListener('click', ()=>{ const a=$from.value; $from.value=$to.value; $to.value=a; localStorage.removeItem(rateKey()); localStorage.removeItem(dateKey()); $rateText.textContent='未取得'; $rateTime.textContent=''; fetchRate(); }); paintSaved();
 
-  const $amount = document.getElementById('amount');
-  const $unit   = document.getElementById('unit');
-  const $from   = document.getElementById('from');
-  const $to     = document.getElementById('to');
-  const $swap   = document.getElementById('swap');
-  const $refresh= document.getElementById('refresh');
-  const $rateText = document.getElementById('rateText');
-  const $rateTime = document.getElementById('rateTime');
-  const $convert  = document.getElementById('convert');
-  const $loading  = document.getElementById('loading');
+  // ===== Chart =====
+  const currencies=[
+    {code:'USD',flag:'🇺🇸',country:'アメリカ',name:'米ドル'},
+    {code:'JPY',flag:'🇯🇵',country:'日本',name:'日本円'},
+    {code:'EUR',flag:'🇪🇺',country:'欧州連合',name:'ユーロ'},
+    {code:'GBP',flag:'🇬🇧',country:'イギリス',name:'英ポンド'},
+    {code:'AUD',flag:'🇦🇺',country:'オーストラリア',name:'豪ドル'},
+    {code:'CAD',flag:'🇨🇦',country:'カナダ',name:'カナダドル'},
+    {code:'CHF',flag:'🇨🇭',country:'スイス',name:'スイスフラン'},
+    {code:'HKD',flag:'🇭🇰',country:'香港',name:'香港ドル'},
+    {code:'CNY',flag:'🇨🇳',country:'中国',name:'人民元'},
+    {code:'KRW',flag:'🇰🇷',country:'韓国',name:'韓国ウォン'},
+    {code:'BTC',flag:'₿',country:'暗号資産',name:'ビットコイン'},
+    {code:'XAU',flag:'🥇',country:'貴金属',name:'ゴールド（金）'}
+  ];
+  const $base=$('base'), $quote=$('quote'), tvContainer=$('chart'), $hint=$('hint');
+  // 初期化
+  currencies.forEach(c=>{ $base.append(new Option(c.code,c.code)); $quote.append(new Option(c.code,c.code)); });
+  const savedPair=store.get('cprefs',{base:'USD',quote:'JPY'}); $base.value=savedPair.base||'USD'; $quote.value=savedPair.quote||'JPY';
+  // Gloss
+  $('list').innerHTML = currencies.map(c=>`<div class="card" style="display:flex;gap:10px;align-items:center"><span style="font-size:22px">${c.flag}</span><b style="width:56px">${c.code}</b><div><div>${c.country}</div><div class="muted">${c.name}</div></div></div>`).join('');
 
-  function rateKey(){ return `rate_${$from.value}_${$to.value}` }
-  function dateKey(){ return `rateAt_${$from.value}_${$to.value}` }
+  function showInvalid(msg){ tvContainer.innerHTML=`<div class="invalid">チャート無効：${msg}</div>`; }
+  const isBTC = (x)=> x==='BTC'; const isXAU=(x)=> x==='XAU';
+  function allowedQuotesForSpecial(base){ if(isBTC(base)||isXAU(base)) return ['JPY','USD']; return null }
+  function updateOptionConstraints(){ const base=$base.value,quote=$quote.value; [...$base.options].forEach(o=>o.disabled=false); [...$quote.options].forEach(o=>o.disabled=false); const qAllow=allowedQuotesForSpecial(base); if(qAllow){ [...$quote.options].forEach(o=>o.disabled=!qAllow.includes(o.value)); if($quote.options[$quote.selectedIndex].disabled){ $quote.value=qAllow.includes('JPY')?'JPY':'USD'; } } const bAllow=allowedQuotesForSpecial(quote); if(bAllow){ [...$base.options].forEach(o=>o.disabled=!bAllow.includes(o.value)); if($base.options[$base.selectedIndex].disabled){ $base.value=bAllow.includes('JPY')?'JPY':'USD'; } } }
+  function currentSymbol(base,quote){ if(base===quote) return null; if((base==='BTC'&&quote==='JPY')||(base==='JPY'&&quote==='BTC')) return 'BITFLYER:BTCJPY'; if((base==='BTC'&&quote==='USD')||(base==='USD'&&quote==='BTC')) return 'BINANCE:BTCUSDT'; if((base==='XAU'&&quote==='JPY')||(base==='JPY'&&quote==='XAU')) return 'OANDA:XAUJPY'; if((base==='XAU'&&quote==='USD')||(base==='USD'&&quote==='XAU')) return 'TVC:GOLD'; if(base!=='BTC'&&quote!=='BTC'&&base!=='XAU'&&quote!=='XAU') return `FX_IDC:${base}${quote}`; return null }
 
-  function saveRate(rate){
-    localStorage.setItem(rateKey(), String(rate));
-    const stamp = new Date().toLocaleString('ja-JP', {year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit'});
-    localStorage.setItem(dateKey(), stamp);
-    paintSaved();
-  }
-  function loadRate(){ const r = parseFloat(localStorage.getItem(rateKey()) || "NaN"); return Number.isFinite(r) ? r : null }
-  function paintSaved(){
-    const r = loadRate(); const t = localStorage.getItem(dateKey()) || "";
-    if (r!=null){ $rateText.textContent = `1 ${$from.value} = ${r.toFixed(4)} ${$to.value}`; $rateTime.textContent = t; }
-    else { $rateText.textContent = "未取得"; $rateTime.textContent = ""; }
-  }
+  function withTV(cb){ if(window.TradingView && TradingView.widget){ cb(); } else { setTimeout(()=>withTV(cb), 60); } }
+  function safeRenderChart(){ try{ renderChart(); }catch(e){ console.error(e); showInvalid('描画エラー: '+(e.message||e)); } }
+  function renderChart(){ const base=$base.value,quote=$quote.value; updateOptionConstraints(); const sym=currentSymbol(base,quote); if(!sym){ showInvalid(base===quote?'同じ通貨ペアは選べません':'この通貨ペアは対応していません'); $hint.textContent=''; return; } tvContainer.innerHTML=''; const h = document.body.classList.contains('layout-desktop') ? 440 : (window.innerWidth<640?380:440); withTV(()=> new TradingView.widget({ container_id:'chart', symbol:sym, interval:'60', width:'100%', height:h, locale:'ja', theme:'light' })); if(base==='XAU'||quote==='XAU'){ $hint.textContent='XAUは金のトロイオンス建て（JPYは円/オンス、USDはドル/オンス）'; } else { $hint.textContent=''; } store.set('cprefs',{base,quote}); }
+  let chartRendered=false; function ensureChartRendered(){ if(!chartRendered){ safeRenderChart(); chartRendered=true; } }
 
-  function parseAmount(){ const base = parseFloat(($amount.value||"").trim()); if (!Number.isFinite(base)) return null; return base * (unitsMap[$unit.value] || 1); }
+  $base.addEventListener('change', safeRenderChart); $quote.addEventListener('change', safeRenderChart); $('btnSwap').addEventListener('click', ()=>{ const t=$base.value; $base.value=$quote.value; $quote.value=t; safeRenderChart(); });
 
-  async function fetchRate(){
-    const from = $from.value, to = $to.value;
-    try{
-      $loading.style.display = "block";
-      const url = `https://v6.exchangerate-api.com/v6/${encodeURIComponent(API_KEY)}/pair/${from}/${to}`;
-      const res = await fetch(url);
-      if(!res.ok) throw new Error(`HTTP ${res.status}`);
-      const j = await res.json();
-      if (j.result!=="success") throw new Error(`API error: ${j.result||"unknown"}`);
-      saveRate(j.conversion_rate);
-    } catch(e){ alert(`レート取得エラー: ${e.message||e}`); }
-    finally{ $loading.style.display = "none"; paintSaved(); }
-  }
-
-  function formatJP(num){ const abs=Math.abs(num), sign=num<0?"-":""; if(abs>=1e12) return `${sign}${(abs/1e12).toFixed(2)}兆`; if(abs>=1e8) return `${sign}${(abs/1e8).toFixed(2)}億`; if(abs>=1e4) return `${sign}${(abs/1e4).toFixed(2)}万`; return `${sign}${abs.toFixed(2)}` }
-  function formatEN(num){ const abs=Math.abs(num), sign=num<0?"-":""; if(abs>=1e12) return `${sign}${(abs/1e12).toFixed(2)}T`; if(abs>=1e9) return `${sign}${(abs/1e9).toFixed(2)}B`; if(abs>=1e6) return `${sign}${(abs/1e6).toFixed(2)}M`; if(abs>=1e3) return `${sign}${(abs/1e3).toFixed(2)}K`; return `${sign}${abs.toFixed(2)}` }
-
-  function convert(){
-    const amt = parseAmount(); if (amt==null){ alert("金額を入力"); return; }
-    const rate = loadRate(); if (rate==null){ alert("レート未取得。『更新』してください"); return; }
-    const converted = amt * rate;
-    document.getElementById('resJP').textContent = "結果: " + formatJP(converted);
-    document.getElementById('resEN').textContent = ($unit.value ? formatEN(converted) : "");
-  }
-
-  $refresh.addEventListener('click', fetchRate);
-  $convert.addEventListener('click', convert);
-  $swap.addEventListener('click', ()=>{
-    const a = $from.value; $from.value = $to.value; $to.value = a;
-    localStorage.removeItem(rateKey()); localStorage.removeItem(dateKey());
-    $rateText.textContent = "未取得"; $rateTime.textContent = ""; fetchRate();
-  });
-
-  paintSaved();
-
-  // ====== Chart view ======
-  const $base  = document.getElementById('base');
-  const $quote = document.getElementById('quote');
-  const tvContainer = document.getElementById('chart');
-  const $hint = document.getElementById('hint');
-  // 触れた瞬間に一応ロック（切替が間に合わない端末向け）
-  tvContainer.addEventListener('touchstart', ()=> setViewportScaling(true), {passive:true});
-  // ===== iPhone横画面のリサイズ多発対策（幅変化のみで再描画＆デバウンス） =====
-  let lastW = window.innerWidth; let resizeTimer = null;
-  function scheduleChartRerenderOnResize(){
-    if (document.body.dataset.feature !== 'chart') return;
-    const w = window.innerWidth;
-    if (Math.abs(w - lastW) < 40) return; // URLバーの出入りなど高さ変化は無視
-    clearTimeout(resizeTimer);
-    resizeTimer = setTimeout(()=>{ lastW = w; renderChart(); }, 220);
-  }
+  // リサイズ多発対策（横画面のURLバー出入り等）
+  let lastW=window.innerWidth, resizeTimer=null; function scheduleChartRerenderOnResize(){ if(document.body.dataset.feature!=='chart') return; const w=window.innerWidth; if(Math.abs(w-lastW)<40) return; clearTimeout(resizeTimer); resizeTimer=setTimeout(()=>{ lastW=w; safeRenderChart(); }, 220); }
   window.addEventListener('resize', scheduleChartRerenderOnResize);
-  window.addEventListener('orientationchange', ()=>{ setTimeout(()=>{ lastW = window.innerWidth; if (document.body.dataset.feature==='chart') renderChart(); }, 350); });
+  window.addEventListener('orientationchange', ()=>{ setTimeout(()=>{ lastW=window.innerWidth; if(document.body.dataset.feature==='chart') safeRenderChart(); }, 350); });
 
-  // ===== 全画面チャート =====
-  let fsNode = null; let onOrientFS = null;
-  function setVHVar(){ const h = (window.visualViewport? window.visualViewport.height: window.innerHeight); document.documentElement.style.setProperty('--vh', (h*0.01)+'px'); }
-  function openFullscreenChart(){
-    if (fsNode) return;
-    setVHVar();
-    fsNode = document.createElement('div'); fsNode.className='fs';
-    fsNode.innerHTML = '<div class="fs-header"><div>📈 チャート（全画面）</div><button id="fsClose" class="ghost">閉じる ✕</button></div><div class="fs-body"><div id="fs-chart"></div></div>';
-    document.body.appendChild(fsNode);
-    const sym = currentSymbol($base.value, $quote.value);
-    function renderFS(){ const h = Math.floor(window.visualViewport? window.visualViewport.height: window.innerHeight); const el = document.getElementById('fs-chart'); if(!el) return; el.innerHTML=''; new TradingView.widget({ container_id:'fs-chart', symbol:sym, interval:'60', width:'100%', height:h, locale:'ja', theme:'light' }); }
-    renderFS();
-    onOrientFS = ()=>{ setTimeout(renderFS, 350); };
-    window.addEventListener('orientationchange', onOrientFS);
+  // フルスクリーン
+  let fsNode=null; function openFullscreen(){ if(fsNode) return; fsNode=document.createElement('div'); fsNode.className='fs'; fsNode.innerHTML='<div class="fs-header"><div>📈 チャート（全画面）</div><button id="fsClose" class="ghost">閉じる ✕</button></div><div class="fs-body"><div id="fs-chart"></div></div>'; document.body.appendChild(fsNode); const sym=currentSymbol($base.value,$quote.value); const renderFS=()=>{ const h=Math.floor(window.visualViewport? window.visualViewport.height: window.innerHeight); const el=$('fs-chart'); if(!el) return; el.innerHTML=''; withTV(()=> new TradingView.widget({ container_id:'fs-chart', symbol:sym, interval:'60', width:'100%', height:h, locale:'ja', theme:'light' })); }; renderFS(); const onOrient=()=> setTimeout(renderFS,350); window.addEventListener('orientationchange', onOrient); $('fsClose').addEventListener('click', ()=>{ window.removeEventListener('orientationchange', onOrient); if(fsNode){ fsNode.remove(); fsNode=null; } }); window.__closeFS=()=>{ try{ window.removeEventListener('orientationchange', onOrient);}catch{} if(fsNode){ fsNode.remove(); fsNode=null; } window.__closeFS=null; }; }
+  $('btnFull').addEventListener('click', openFullscreen);
 
-    // グローバルに閉じる関数を提供（他ビューへ切替時に呼ぶ）
-    window.__closeFS = function(){
-      window.removeEventListener('orientationchange', onOrientFS);
-      if (fsNode){ fsNode.remove(); fsNode=null; }
-      window.__closeFS = null;
-    };
-    document.getElementById('fsClose').addEventListener('click', ()=>{ if (window.__closeFS) window.__closeFS(); });
-  }
-  const $btnFull = document.getElementById('btnFull'); if ($btnFull) $btnFull.addEventListener('click', openFullscreenChart);
+  // ===== Gloss list already built above =====
 
-  // セレクト初期化（チャート用）
-  currencies.forEach(c => { $base.append(new Option(c.code, c.code)); $quote.append(new Option(c.code, c.code)); });
-  const savedPair = store.get('cprefs', {base:'USD', quote:'JPY'});
-  $base.value  = savedPair.base  || 'USD';
-  $quote.value = savedPair.quote || 'JPY';
-
-  // Glossary
-  document.getElementById('list').innerHTML = currencies.map(c => `
-    <div class="card" style="display:flex; gap:10px; align-items:center">
-      <span style="font-size:22px">${c.flag}</span>
-      <b style="width:56px">${c.code}</b>
-      <div>
-        <div>${c.country}</div>
-        <div class="muted">${c.name}</div>
-      </div>
-    </div>
-  `).join("");
-
-  function showInvalid(msg){ tvContainer.innerHTML = `<div class="invalid">チャート無効：${msg}</div>`; }
-  const isBTC = (x)=> x==='BTC';
-  const isXAU = (x)=> x==='XAU';
-  function allowedQuotesForSpecial(base){ if (isBTC(base) || isXAU(base)) return ['JPY','USD']; return null }
-
-  function updateOptionConstraints(){
-    const base = $base.value, quote = $quote.value;
-    [...$base.options].forEach(o=>o.disabled=false);
-    [...$quote.options].forEach(o=>o.disabled=false);
-
-    const qAllow = allowedQuotesForSpecial(base);
-    if (qAllow){
-      [...$quote.options].forEach(o=>{ o.disabled = !qAllow.includes(o.value); });
-      if ($quote.options[$quote.selectedIndex].disabled){ $quote.value = qAllow.includes('JPY') ? 'JPY' : 'USD'; }
-    }
-    const bAllow = allowedQuotesForSpecial(quote);
-    if (bAllow){
-      [...$base.options].forEach(o=>{ o.disabled = !bAllow.includes(o.value); });
-      if ($base.options[$base.selectedIndex].disabled){ $base.value = bAllow.includes('JPY') ? 'JPY' : 'USD'; }
-    }
-  }
-
-  function currentSymbol(base, quote){
-    if (base === quote) return null;
-    if ((base==='BTC' && quote==='JPY') || (base==='JPY' && quote==='BTC')) return 'BITFLYER:BTCJPY';
-    if ((base==='BTC' && quote==='USD') || (base==='USD' && quote==='BTC')) return 'BINANCE:BTCUSDT';
-    if ((base==='XAU' && quote==='JPY') || (base==='JPY' && quote==='XAU')) return 'OANDA:XAUJPY';
-    if ((base==='XAU' && quote==='USD') || (base==='USD' && quote==='XAU')) return 'TVC:GOLD'; // 代替: OANDA:XAUUSD
-    if (base!=='BTC' && quote!=='BTC' && base!=='XAU' && quote!=='XAU') return `FX_IDC:${base}${quote}`;
-    return null;
-  }
-
-  let chartRendered = false;
-  function ensureChartRendered(){ if (!chartRendered){ renderChart(); chartRendered = true; } }
-
-  function renderChart(){
-    const base = $base.value, quote = $quote.value; updateOptionConstraints();
-    const sym = currentSymbol(base, quote);
-    if (!sym){ showInvalid(base===quote? '同じ通貨ペアは選べません' : 'この通貨ペアは対応していません'); $hint.textContent=''; return; }
-    tvContainer.innerHTML = '';
-    new TradingView.widget({ container_id:'chart', symbol:sym, interval:'60', width:'100%', height: (document.body.classList.contains('layout-desktop') ? 440 : (window.innerWidth < 640 ? 380 : 440)), locale:'ja', theme:'light' });
-    if (base==='XAU' || quote==='XAU'){ $hint.textContent = 'XAU は金のトロイオンス建て（JPY は円/オンス、USD はドル/オンス）'; } else { $hint.textContent=''; }
-    store.set('cprefs', { base, quote });
-  }
-
-  $base.addEventListener('change', ()=>{ renderChart() });
-  $quote.addEventListener('change', ()=>{ renderChart() });
-  document.getElementById('btnSwap').addEventListener('click', ()=>{ const t=$base.value; $base.value=$quote.value; $quote.value=t; renderChart(); });
-  // resize handler is replaced by scheduleChartRerenderOnResize (width-only, debounced)
-
-  // 初期表示（必要なときだけ）
-  if (document.body.dataset.feature==='chart') ensureChartRendered();
+  // ===== ページズーム常時OFFの追加保険：Safari gesture系を抑止 =====
+  const gestureGuard=(e)=>{ e.preventDefault(); };
+  ['gesturestart','gesturechange','gestureend'].forEach(type=>{ try{ window.addEventListener(type, gestureGuard, {passive:false}); }catch{ window.addEventListener(type, gestureGuard); } });
+})();
 </script>
+</body>
 </html>
