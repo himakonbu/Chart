@@ -222,29 +222,45 @@
     set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)) }catch{} }
   };
 
-  /* ====== Viewport scaling toggle (Chart時のみページ拡大を抑止) ====== */
-  const viewportMeta = document.querySelector('meta[name="viewport"]');
-  const originalViewport = viewportMeta?.getAttribute('content') || 'width=device-width, initial-scale=1';
-  function setViewportScaling(disable){
+  /* ====== Viewport scaling toggle (Chart時のみページ拡大を抑止・強化版) ====== */
+  let viewportMeta = document.querySelector('meta[name="viewport"]');
+  const ORIGINAL_VIEWPORT = viewportMeta?.getAttribute('content') || 'width=device-width, initial-scale=1';
+  const LOCKED_VIEWPORT   = 'width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no';
+
+  function applyViewport(content){
     if (!viewportMeta) return;
-    if (disable){
-      const base = originalViewport.split(',').filter(s=>!(/maximum-scale|user-scalable/i).test(s)).join(',').trim();
-      viewportMeta.setAttribute('content', base + ', maximum-scale=1, user-scalable=no');
-    } else {
-      viewportMeta.setAttribute('content', originalViewport);
-    }
+    viewportMeta.setAttribute('content', content);
+    // iOS Safari 対策：要素を置換して反映を強制
+    const clone = viewportMeta.cloneNode();
+    clone.setAttribute('content', content);
+    viewportMeta.parentNode.replaceChild(clone, viewportMeta);
+    viewportMeta = clone;
   }
-  window.addEventListener('pageshow', ()=>{ if(document.body.dataset?.feature==='chart') setViewportScaling(true); });
-  window.addEventListener('beforeunload', ()=> setViewportScaling(false));
+  function setViewportScaling(disable){ applyViewport(disable ? LOCKED_VIEWPORT : ORIGINAL_VIEWPORT); }
+
+  // Safariの独自gestureイベントを抑止（効かない環境もあり。保険）
+  const gestureGuard = (e)=>{ if (document.body.dataset.feature==='chart') { e.preventDefault(); } };
+  function enableGestureGuard(enable){
+    ['gesturestart','gesturechange','gestureend'].forEach(type=>{
+      try{ window.removeEventListener(type, gestureGuard, {passive:false}); }catch(_){ window.removeEventListener(type, gestureGuard); }
+      if (enable){ try{ window.addEventListener(type, gestureGuard, {passive:false}); }catch(_){ window.addEventListener(type, gestureGuard); }
+    });
+  }
+
+  // 初期/復帰時に適用
+  window.addEventListener('pageshow', ()=>{ const onChart = document.body.dataset?.feature==='chart'; setViewportScaling(onChart); enableGestureGuard(onChart); });
+  window.addEventListener('beforeunload', ()=> { setViewportScaling(false); enableGestureGuard(false); });
 
   // ====== Header: feature tabs & menu ======
   function setFeature(f){
     document.body.dataset.feature = f;
     store.set('feature', f);
-    // チャート時のみページ拡大（ピンチ/ダブルタップ）を抑止
-    setViewportScaling(f==='chart');
-    // チャート以外に移動したら、全画面表示中なら閉じる
-    if (f !== 'chart' && window.__closeFS) { try{ window.__closeFS(); }catch(e){} }
+    const lock = f==='chart';
+    setViewportScaling(lock);
+    enableGestureGuard(lock);
+    if (!lock && window.__closeFS) { try{ window.__closeFS(); }catch(e){} }
+    if (lock) ensureChartRendered();
+  }catch(e){} }
     if (f==='chart') ensureChartRendered();
   }
 
@@ -359,6 +375,8 @@
   const $quote = document.getElementById('quote');
   const tvContainer = document.getElementById('chart');
   const $hint = document.getElementById('hint');
+  // 触れた瞬間に一応ロック（切替が間に合わない端末向け）
+  tvContainer.addEventListener('touchstart', ()=> setViewportScaling(true), {passive:true});
   // ===== iPhone横画面のリサイズ多発対策（幅変化のみで再描画＆デバウンス） =====
   let lastW = window.innerWidth; let resizeTimer = null;
   function scheduleChartRerenderOnResize(){
