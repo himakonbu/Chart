@@ -82,6 +82,11 @@
 
   /* Chart height tweak for mobile */
   @media (max-width:640px){ #chart{ margin-top:8px } }
+  /* === Fullscreen chart overlay === */
+  .fs{position:fixed; inset:0; background:#fff; z-index:100; display:flex; flex-direction:column}
+  .fs-header{display:flex; align-items:center; justify-content:space-between; gap:8px; padding:8px 12px; border-bottom:1px solid var(--border)}
+  .fs-body{flex:1; min-height:0}
+  #fs-chart{ width:100%; height:100%; }
 </style>
 
 <header>
@@ -168,7 +173,7 @@
   <!-- ===== Chart View ===== -->
   <section id="view-chart" class="view">
     <section class="card">
-      <div class="label">通貨ペア（チャート）</div>
+      <div class="row" style="grid-template-columns:auto auto; align-items:center"><div class="label" style="margin:0">通貨ペア（チャート）</div><button id="btnFull" class="ghost" style="justify-self:end">⤢ 全画面</button></div>
       <div class="row row-3">
         <select id="base" aria-label="基軸通貨"></select>
         <div class="swap"><button id="btnSwap" title="入れ替え">↔︎</button></div>
@@ -344,6 +349,35 @@
   const $quote = document.getElementById('quote');
   const tvContainer = document.getElementById('chart');
   const $hint = document.getElementById('hint');
+  // ===== iPhone横画面のリサイズ多発対策（幅変化のみで再描画＆デバウンス） =====
+  let lastW = window.innerWidth; let resizeTimer = null;
+  function scheduleChartRerenderOnResize(){
+    if (document.body.dataset.feature !== 'chart') return;
+    const w = window.innerWidth;
+    if (Math.abs(w - lastW) < 40) return; // URLバーの出入りなど高さ変化は無視
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(()=>{ lastW = w; renderChart(); }, 220);
+  }
+  window.addEventListener('resize', scheduleChartRerenderOnResize);
+  window.addEventListener('orientationchange', ()=>{ setTimeout(()=>{ lastW = window.innerWidth; if (document.body.dataset.feature==='chart') renderChart(); }, 350); });
+
+  // ===== 全画面チャート =====
+  let fsNode = null; let onOrientFS = null;
+  function setVHVar(){ const h = (window.visualViewport? window.visualViewport.height: window.innerHeight); document.documentElement.style.setProperty('--vh', (h*0.01)+'px'); }
+  function openFullscreenChart(){
+    if (fsNode) return;
+    setVHVar();
+    fsNode = document.createElement('div'); fsNode.className='fs';
+    fsNode.innerHTML = '<div class="fs-header"><div>📈 チャート（全画面）</div><button id="fsClose" class="ghost">閉じる ✕</button></div><div class="fs-body"><div id="fs-chart"></div></div>';
+    document.body.appendChild(fsNode);
+    const sym = currentSymbol($base.value, $quote.value);
+    function renderFS(){ const h = Math.floor(window.visualViewport? window.visualViewport.height: window.innerHeight); const el = document.getElementById('fs-chart'); if(!el) return; el.innerHTML=''; new TradingView.widget({ container_id:'fs-chart', symbol:sym, interval:'60', width:'100%', height:h, locale:'ja', theme:'light' }); }
+    renderFS();
+    onOrientFS = ()=>{ setTimeout(renderFS, 350); };
+    window.addEventListener('orientationchange', onOrientFS);
+    document.getElementById('fsClose').addEventListener('click', ()=>{ window.removeEventListener('orientationchange', onOrientFS); if (fsNode){ fsNode.remove(); fsNode=null; } });
+  }
+  const $btnFull = document.getElementById('btnFull'); if ($btnFull) $btnFull.addEventListener('click', openFullscreenChart);
 
   // セレクト初期化（チャート用）
   currencies.forEach(c => { $base.append(new Option(c.code, c.code)); $quote.append(new Option(c.code, c.code)); });
@@ -411,7 +445,7 @@
   $base.addEventListener('change', ()=>{ renderChart() });
   $quote.addEventListener('change', ()=>{ renderChart() });
   document.getElementById('btnSwap').addEventListener('click', ()=>{ const t=$base.value; $base.value=$quote.value; $quote.value=t; renderChart(); });
-  window.addEventListener('resize', ()=>{ if (document.body.dataset.feature==='chart') renderChart(); });
+  // resize handler is replaced by scheduleChartRerenderOnResize (width-only, debounced)
 
   // 初期表示（必要なときだけ）
   if (document.body.dataset.feature==='chart') ensureChartRendered();
