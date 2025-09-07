@@ -74,6 +74,9 @@
   /* Manual layout helpers */
   body.layout-mobile .wrap{max-width:440px}
   body.layout-desktop .wrap{max-width:980px}
+  /* Force amount row columns according to manual mode */
+  body.layout-mobile .row-amt{grid-template-columns:1fr}
+  body.layout-desktop .row-amt{grid-template-columns:1fr 140px}
 
   /* Chart height tweak for mobile */
   @media (max-width:640px){ #chart{ margin-top:8px } }
@@ -243,6 +246,10 @@
     document.body.classList.remove('layout-mobile','layout-desktop');
     if (mode==='mobile') document.body.classList.add('layout-mobile');
     if (mode==='desktop') document.body.classList.add('layout-desktop');
+    // Re-render chart to adapt widget height/layout after mode change
+    if (document.body.dataset.feature === 'chart') { try{ renderChart(); }catch(e){} }
+    // Close menu after selection (helps on mobile)
+    try{ $menu.classList.remove('show'); }catch(e){}
   }
 
   // ====== Convert view ======
@@ -377,7 +384,7 @@
     const sym = currentSymbol(base, quote);
     if (!sym){ showInvalid(base===quote? '同じ通貨ペアは選べません' : 'この通貨ペアは対応していません'); $hint.textContent=''; return; }
     tvContainer.innerHTML = '';
-    new TradingView.widget({ container_id:'chart', symbol:sym, interval:'60', width:'100%', height:(window.innerWidth<640?380:440), locale:'ja', theme:'light' });
+    new TradingView.widget({ container_id:'chart', symbol:sym, interval:'60', width:'100%', height: (document.body.classList.contains('layout-desktop') ? 440 : (window.innerWidth < 640 ? 380 : 440)), locale:'ja', theme:'light' });
     if (base==='XAU' || quote==='XAU'){ $hint.textContent = 'XAU は金のトロイオンス建て（JPY は円/オンス、USD はドル/オンス）'; } else { $hint.textContent=''; }
     store.set('cprefs', { base, quote });
   }
