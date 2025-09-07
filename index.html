@@ -2,7 +2,7 @@
 <html lang="ja">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>通貨ツール（変換・チャート・解説）</title>
+<title>通貨ツール（変換・チャート・解説 統合版）</title>
 <style>
   :root{
     --accent:#22c55e; --bg:#f6f7f9; --card:#ffffff; --text:#0f172a; --border:#e5e7eb; --radius:14px; --muted:#64748b;
@@ -21,7 +21,7 @@
   .seg label{ padding:8px 12px; cursor:pointer; font-size:.95rem; user-select:none; display:flex; align-items:center; gap:8px }
   .seg .icon{ font-size:1.1rem }
   .seg input:checked + label{ background:var(--accent); color:#fff }
-  /* スペース節約：狭い幅ではテキストを隠してアイコンだけ */
+  /* 狭い幅ではテキストを隠してアイコンだけ */
   @media (max-width:520px){ .seg label .text{ display:none } }
 
   .wrap{max-width:980px; margin:0 auto; padding:16px 12px 56px; display:grid; gap:12px}
@@ -57,11 +57,10 @@
   .view{ display:none }
   /* JSが落ちても最低限コンバート画面は見えるようにするフォールバック */
   #view-convert{ display:block }
-  /* data-featureが設定されたら通常ルールに戻す */
+  /* data-feature が設定されたら通常ルールに戻す */
   body[data-feature] #view-convert{ display:none }
   body[data-feature="convert"] #view-convert{ display:block }
   body[data-feature="chart"]   #view-chart{ display:block }
-  body[data-feature="gloss"]   #view-gloss{ display:block }
 
   /* ===== Chart specific ===== */
   #chart{ margin-top:12px }
@@ -97,14 +96,12 @@
   <div class="header-inner">
     <div class="title">💱 通貨ツール</div>
 
-    <!-- 機能切替：変換 / チャート / 解説 -->
+    <!-- 機能切替：変換 / チャート（※解説は各ページ下部に統合） -->
     <div class="seg" id="featureSeg" role="tablist" aria-label="機能切替">
       <input type="radio" name="feature" id="f-convert" value="convert" checked>
       <label for="f-convert"><span class="icon">🔁</span><span class="text">変換</span></label>
       <input type="radio" name="feature" id="f-chart" value="chart">
       <label for="f-chart"><span class="icon">📈</span><span class="text">チャート</span></label>
-      <input type="radio" name="feature" id="f-gloss" value="gloss">
-      <label for="f-gloss"><span class="icon">💡</span><span class="text">解説</span></label>
     </div>
 
     <!-- 右上メニュー（レイアウトなど） -->
@@ -172,13 +169,31 @@
         <div id="resEN" class="result-en"></div>
       </div>
     </section>
+
+    <!-- ▼ 解説（同ページ下部） -->
+    <section class="card">
+      <div class="label">通貨コード解説</div>
+      <div id="list-convert" class="row" style="grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:10px"></div>
+    </section>
   </section>
 
   <!-- ===== Chart View ===== -->
   <section id="view-chart" class="view">
     <section class="card">
-      <div class="row" style="grid-template-columns:auto auto; align-items:center"><div class="label" style="margin:0">通貨ペア（チャート）</div><button id="btnFull" class="ghost" style="justify-self:end">⤢ 全画面</button></div>
-      <div class="row row-3">
+      <div class="row" style="grid-template-columns:auto 1fr auto; align-items:center">
+        <div class="label" style="margin:0">通貨ペア（チャート）</div>
+        <!-- 時間軸: 日足 / 週足 / 月足 -->
+        <div class="seg" id="intervalSeg" role="tablist" aria-label="時間軸">
+          <input type="radio" name="tf" id="tf-D" value="D" checked>
+          <label for="tf-D">日足</label>
+          <input type="radio" name="tf" id="tf-W" value="W">
+          <label for="tf-W">週足</label>
+          <input type="radio" name="tf" id="tf-M" value="M">
+          <label for="tf-M">月足</label>
+        </div>
+        <button id="btnFull" class="ghost" style="justify-self:end">⤢ 全画面</button>
+      </div>
+      <div class="row row-3" style="margin-top:4px">
         <select id="base" aria-label="基軸通貨"></select>
         <div class="swap"><button id="btnSwap" title="入れ替え">↔︎</button></div>
         <select id="quote" aria-label="決済通貨"></select>
@@ -186,13 +201,11 @@
       <div id="chart" aria-live="polite"></div>
       <div id="hint" class="muted" style="margin-top:6px"></div>
     </section>
-  </section>
 
-  <!-- ===== Glossary View ===== -->
-  <section id="view-gloss" class="view">
+    <!-- ▼ 解説（同ページ下部） -->
     <section class="card">
       <div class="label">通貨コード解説</div>
-      <div id="list" class="row" style="grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:10px"></div>
+      <div id="list-chart" class="row" style="grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:10px"></div>
     </section>
   </section>
 </div>
@@ -202,18 +215,18 @@
 <script>
   // ====== Config / Shared ======
   const currencies = [
-    {code:"USD", flag:"🇺🇸", country:"アメリカ", name:"米ドル"},
-    {code:"JPY", flag:"🇯🇵", country:"日本",     name:"日本円"},
-    {code:"EUR", flag:"🇪🇺", country:"欧州連合", name:"ユーロ"},
-    {code:"GBP", flag:"🇬🇧", country:"イギリス", name:"英ポンド"},
+    {code:"USD", flag:"🇺🇸", country:"アメリカ",     name:"米ドル"},
+    {code:"JPY", flag:"🇯🇵", country:"日本",         name:"日本円"},
+    {code:"EUR", flag:"🇪🇺", country:"欧州連合",     name:"ユーロ"},
+    {code:"GBP", flag:"🇬🇧", country:"イギリス",     name:"英ポンド"},
     {code:"AUD", flag:"🇦🇺", country:"オーストラリア", name:"豪ドル"},
-    {code:"CAD", flag:"🇨🇦", country:"カナダ",   name:"カナダドル"},
-    {code:"CHF", flag:"🇨🇭", country:"スイス",   name:"スイスフラン"},
-    {code:"HKD", flag:"🇭🇰", country:"香港",     name:"香港ドル"},
-    {code:"CNY", flag:"🇨🇳", country:"中国",     name:"人民元"},
-    {code:"KRW", flag:"🇰🇷", country:"韓国",     name:"韓国ウォン"},
-    {code:"BTC", flag:"₿",   country:"暗号資産", name:"ビットコイン"},
-    {code:"XAU", flag:"🥇",   country:"貴金属",   name:"ゴールド（金）"}
+    {code:"CAD", flag:"🇨🇦", country:"カナダ",       name:"カナダドル"},
+    {code:"CHF", flag:"🇨🇭", country:"スイス",       name:"スイスフラン"},
+    {code:"HKD", flag:"🇭🇰", country:"香港",         name:"香港ドル"},
+    {code:"CNY", flag:"🇨🇳", country:"中国",         name:"人民元"},
+    {code:"KRW", flag:"🇰🇷", country:"韓国",         name:"韓国ウォン"},
+    {code:"BTC", flag:"₿",   country:"暗号資産",     name:"ビットコイン"},
+    {code:"XAU", flag:"🥇",   country:"貴金属",       name:"ゴールド（金）"}
   ];
 
   // Persist helpers
@@ -240,7 +253,6 @@
   // ====== Header: feature tabs & menu ======
   function setFeature(f){
     document.body.dataset.feature = f;
-    store.set('feature', f);
     // チャート時のみページ拡大（ピンチ/ダブルタップ）を抑止
     setViewportScaling(f==='chart');
     // チャート以外に移動したら、全画面表示中なら閉じる
@@ -248,13 +260,9 @@
     if (f==='chart') ensureChartRendered();
   }
 
-  const savedFeature = store.get('feature','convert');
-  try{
-    document.getElementById('f-'+savedFeature)?.setAttribute('checked','checked');
-    setFeature(savedFeature);
-  }catch(e){
-    setFeature('convert');
-  }
+  // 起動時は常に「変換」から開始（ユーザー要望）
+  document.getElementById('f-convert').setAttribute('checked','checked');
+  setFeature('convert');
 
   document.getElementById('featureSeg').addEventListener('change', ()=>{
     const f = document.querySelector('#featureSeg input:checked')?.value || 'convert';
@@ -359,7 +367,18 @@
   const $quote = document.getElementById('quote');
   const tvContainer = document.getElementById('chart');
   const $hint = document.getElementById('hint');
-  // ===== iPhone横画面のリサイズ多発対策（幅変化のみで再描画＆デバウンス） =====
+
+  // 時間軸（D/W/M）
+  const intervalSeg = document.getElementById('intervalSeg');
+  let currentInterval = store.get('cinterval','D');
+  intervalSeg.querySelector(`#tf-${currentInterval}`)?.setAttribute('checked','checked');
+  intervalSeg.addEventListener('change', ()=>{
+    currentInterval = intervalSeg.querySelector('input:checked')?.value || 'D';
+    store.set('cinterval', currentInterval);
+    if (document.body.dataset.feature==='chart') renderChart();
+  });
+
+  // iPhone横画面のリサイズ多発対策（幅変化のみで再描画＆デバウンス）
   let lastW = window.innerWidth; let resizeTimer = null;
   function scheduleChartRerenderOnResize(){
     if (document.body.dataset.feature !== 'chart') return;
@@ -373,15 +392,13 @@
 
   // ===== 全画面チャート =====
   let fsNode = null; let onOrientFS = null;
-  function setVHVar(){ const h = (window.visualViewport? window.visualViewport.height: window.innerHeight); document.documentElement.style.setProperty('--vh', (h*0.01)+'px'); }
   function openFullscreenChart(){
     if (fsNode) return;
-    setVHVar();
     fsNode = document.createElement('div'); fsNode.className='fs';
     fsNode.innerHTML = '<div class="fs-header"><div>📈 チャート（全画面）</div><button id="fsClose" class="ghost">閉じる ✕</button></div><div class="fs-body"><div id="fs-chart"></div></div>';
     document.body.appendChild(fsNode);
     const sym = currentSymbol($base.value, $quote.value);
-    function renderFS(){ const h = Math.floor(window.visualViewport? window.visualViewport.height: window.innerHeight); const el = document.getElementById('fs-chart'); if(!el) return; el.innerHTML=''; new TradingView.widget({ container_id:'fs-chart', symbol:sym, interval:'60', width:'100%', height:h, locale:'ja', theme:'light' }); }
+    function renderFS(){ const h = Math.floor(window.visualViewport? window.visualViewport.height: window.innerHeight); const el = document.getElementById('fs-chart'); if(!el) return; el.innerHTML=''; new TradingView.widget({ container_id:'fs-chart', symbol:sym, interval: currentInterval, width:'100%', height:h, locale:'ja', theme:'light', disabled_features:['header_interval_dialog_button'] }); }
     renderFS();
     onOrientFS = ()=>{ setTimeout(renderFS, 350); };
     window.addEventListener('orientationchange', onOrientFS);
@@ -401,18 +418,6 @@
   const savedPair = store.get('cprefs', {base:'USD', quote:'JPY'});
   $base.value  = savedPair.base  || 'USD';
   $quote.value = savedPair.quote || 'JPY';
-
-  // Glossary
-  document.getElementById('list').innerHTML = currencies.map(c => `
-    <div class="card" style="display:flex; gap:10px; align-items:center">
-      <span style="font-size:22px">${c.flag}</span>
-      <b style="width:56px">${c.code}</b>
-      <div>
-        <div>${c.country}</div>
-        <div class="muted">${c.name}</div>
-      </div>
-    </div>
-  `).join("");
 
   function showInvalid(msg){ tvContainer.innerHTML = `<div class="invalid">チャート無効：${msg}</div>`; }
   const isBTC = (x)=> x==='BTC';
@@ -449,12 +454,17 @@
   let chartRendered = false;
   function ensureChartRendered(){ if (!chartRendered){ renderChart(); chartRendered = true; } }
 
+  function chartHeight(){ return (document.body.classList.contains('layout-desktop') ? 440 : (window.innerWidth < 640 ? 380 : 440)); }
+
   function renderChart(){
     const base = $base.value, quote = $quote.value; updateOptionConstraints();
     const sym = currentSymbol(base, quote);
     if (!sym){ showInvalid(base===quote? '同じ通貨ペアは選べません' : 'この通貨ペアは対応していません'); $hint.textContent=''; return; }
     tvContainer.innerHTML = '';
-    new TradingView.widget({ container_id:'chart', symbol:sym, interval:'60', width:'100%', height: (document.body.classList.contains('layout-desktop') ? 440 : (window.innerWidth < 640 ? 380 : 440)), locale:'ja', theme:'light' });
+    new TradingView.widget({
+      container_id:'chart', symbol:sym, interval: currentInterval, width:'100%', height: chartHeight(), locale:'ja', theme:'light',
+      disabled_features:['header_interval_dialog_button']
+    });
     if (base==='XAU' || quote==='XAU'){ $hint.textContent = 'XAU は金のトロイオンス建て（JPY は円/オンス、USD はドル/オンス）'; } else { $hint.textContent=''; }
     store.set('cprefs', { base, quote });
   }
@@ -462,9 +472,25 @@
   $base.addEventListener('change', ()=>{ renderChart() });
   $quote.addEventListener('change', ()=>{ renderChart() });
   document.getElementById('btnSwap').addEventListener('click', ()=>{ const t=$base.value; $base.value=$quote.value; $quote.value=t; renderChart(); });
-  // resize handler is replaced by scheduleChartRerenderOnResize (width-only, debounced)
 
   // 初期表示（必要なときだけ）
   if (document.body.dataset.feature==='chart') ensureChartRendered();
+
+  // ===== Glossary (各ページ下部へ描画) =====
+  function renderGlossaryInto(id){
+    const el = document.getElementById(id); if(!el) return;
+    el.innerHTML = currencies.map(c => `
+      <div class="card" style="display:flex; gap:10px; align-items:center">
+        <span style="font-size:22px">${c.flag}</span>
+        <b style="width:56px">${c.code}</b>
+        <div>
+          <div>${c.country}</div>
+          <div class="muted">${c.name}</div>
+        </div>
+      </div>
+    `).join("");
+  }
+  renderGlossaryInto('list-convert');
+  renderGlossaryInto('list-chart');
 </script>
 </html>
